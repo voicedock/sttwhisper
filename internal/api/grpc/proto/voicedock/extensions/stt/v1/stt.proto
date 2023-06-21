@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package voicedock.extensions.stt.v1;
+
+option csharp_namespace = "Voicedock.Extensions.Stt.V1";
+option go_package = "voicedock/extensions/stt/v1;sttv1";
+option java_multiple_files = true;
+option java_outer_classname = "SttProto";
+option java_package = "com.voicedock.extensions.stt.v1";
+option objc_class_prefix = "VES";
+option php_namespace = "Voicedock\\Extensions\\Stt\\V1";
+
+// Language pack info.
+message LanguagePack {
+  // Language pack name
+  string name = 1;
+  // Support language codes
+  repeated string languages = 2;
+  // Is downloaded
+  bool downloaded = 3;
+  // Can be downloaded
+  bool downloadable = 4;
+  // License text to accept
+  string license = 5;
+}

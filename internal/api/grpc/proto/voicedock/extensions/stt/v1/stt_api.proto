@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package voicedock.extensions.stt.v1;
+
+option csharp_namespace = "Voicedock.Extensions.Stt.V1";
+option go_package = "voicedock/extensions/stt/v1;sttv1";
+option java_multiple_files = true;
+option java_outer_classname = "SttApiProto";
+option java_package = "com.voicedock.extensions.stt.v1";
+option objc_class_prefix = "VES";
+option php_namespace = "Voicedock\\Extensions\\Stt\\V1";
+
+import "voicedock/extensions/common/v1/audiostream.proto";
+import "voicedock/extensions/stt/v1/stt.proto";
+
+// Speech-to-text service.
+service SttAPI {
+  // Converts speech to text.
+  rpc SpeechToText(stream SpeechToTextRequest) returns (stream SpeechToTextResponse);
+  // Returns available language packs.
+  rpc GetLanguagePacks(GetLanguagePacksRequest) returns (GetLanguagePacksResponse);
+  // Downloads selected language pack.
+  rpc DownloadLanguagePack(DownloadLanguagePackRequest) returns (DownloadLanguagePackResponse);
+}
+
+message SpeechToTextRequest {
+  // Audio data
+  AudioStream data = 1;
+  // Audio language
+  string lang = 2;
+}
+
+message SpeechToTextResponse {
+  // Text token
+  string token_text = 1;
+  // Text recognition probability
+  float token_probability = 2;
+}
+
+message GetLanguagePacksRequest { }
+
+message GetLanguagePacksResponse {
+  repeated LanguagePack languages = 1;
+}
+
+message DownloadLanguagePackRequest {
+  // Language pack name.
+  string name = 1;
+}
+
+message DownloadLanguagePackResponse { }
