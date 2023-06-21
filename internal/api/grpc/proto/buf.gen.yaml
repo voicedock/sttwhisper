@@ -2,7 +2,7 @@ version: v1
 managed:
   enabled: true
   go_package_prefix:
-    default: github.com/voicedock/ttspiper/internal/api/grpc/gen
+    default: github.com/voicedock/sttwhisper/internal/api/grpc/gen
 plugins:
   - name: go
     out: internal/api/grpc/gen

@@ -2,9 +2,9 @@ package main
 
 import (
 	"fmt"
-	grpcapi "github.com/voicedock/ttspiper/internal/api/grpc"
-	ttsv1 "github.com/voicedock/ttspiper/internal/api/grpc/gen/voicedock/extensions/tts/v1"
-	"github.com/voicedock/ttspiper/internal/config"
+	grpcapi "github.com/voicedock/sttwhisper/internal/api/grpc"
+	sttv1 "github.com/voicedock/sttwhisper/internal/api/grpc/gen/voicedock/extensions/stt/v1"
+	"github.com/voicedock/sttwhisper/internal/config"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 	"net"
@@ -18,15 +18,15 @@ func main() {
 
 	dataDir := "/data/dataset"
 	dl := config.NewDownloader()
-	cr := config.NewConfReader("/data/config/ttspiper.json")
+	cr := config.NewConfReader("/data/config/sttwhisper.json")
 	dr := config.NewDataReader(dataDir)
 	cs := config.NewService(cr, dr, dl, dataDir)
 	cs.LoadConfig()
 
-	srv := grpcapi.NewServerTts(cs)
+	srv := grpcapi.NewServerStt(cs)
 
 	s := grpc.NewServer()
-	ttsv1.RegisterTtsAPIServer(s, srv)
+	sttv1.RegisterSttAPIServer(s, srv)
 	reflection.Register(s)
 	s.Serve(lis)
 }

@@ -25,7 +25,7 @@ service SttAPI {
 
 message SpeechToTextRequest {
   // Audio data
-  AudioStream data = 1;
+  voicedock.extensions.common.v1.AudioStream data = 1;
   // Audio language
   string lang = 2;
 }

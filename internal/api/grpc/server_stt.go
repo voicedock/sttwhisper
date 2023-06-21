@@ -1,138 +1,131 @@
 package grpc
 
+import "C"
 import (
 	"context"
 	"errors"
-	"github.com/go-audio/audio"
-	"github.com/go-audio/wav"
-	ttsv1 "github.com/voicedock/ttspiper/internal/api/grpc/gen/voicedock/extensions/tts/v1"
-	"github.com/voicedock/ttspiper/internal/config"
-	"os"
-	"sync"
-	"unsafe"
+	"fmt"
+	"github.com/ggerganov/whisper.cpp/bindings/go/pkg/whisper"
+	commonv1 "github.com/voicedock/sttwhisper/internal/api/grpc/gen/voicedock/extensions/common/v1"
+	sttv1 "github.com/voicedock/sttwhisper/internal/api/grpc/gen/voicedock/extensions/stt/v1"
+	"github.com/voicedock/sttwhisper/internal/config"
+	"io"
+	"math"
 )
 
-/*
-#cgo CFLAGS: -I/usr/local/include/ttspiperlib
-#cgo LDFLAGS: -L/usr/local/lib -lttspiperlib -Wl,-rpath=/usr/local/lib
-#include "ttspiperlib.h"
-*/
-import "C"
-
-var mu sync.Mutex
-var index int
-var fns = make(map[int]func(data *C.int16_t, len C.int))
-
-//export textToAudioCb
-func textToAudioCb(cbId C.int, audioBuf *C.int16_t, audioBufLen C.int) {
-	fn := lookup(int(cbId))
-	fn(audioBuf, audioBufLen)
-}
-
-func register(cb func(data *C.int16_t, len C.int)) int {
-	mu.Lock()
-	defer mu.Unlock()
-	index++
-	for fns[index] != nil {
-		index++
-	}
-	fns[index] = cb
-	return index
-}
-
-func lookup(i int) func(data *C.int16_t, len C.int) {
-	mu.Lock()
-	defer mu.Unlock()
-	return fns[i]
-}
-
-func unregister(i int) {
-	mu.Lock()
-	defer mu.Unlock()
-	delete(fns, i)
-}
-
-func NewServerTts(configService *config.Service) *ServerTts {
-	return &ServerTts{
+func NewServerStt(configService *config.Service) *ServerStt {
+	return &ServerStt{
 		configService: configService,
 	}
 }
 
-type ServerTts struct {
+type ServerStt struct {
 	configService *config.Service
-	ttsv1.UnimplementedTtsAPIServer
+	sttv1.UnimplementedSttAPIServer
 }
 
-func (s *ServerTts) TextToSpeech(in *ttsv1.TextToSpeechRequest, srv ttsv1.TtsAPI_TextToSpeechServer) error {
-	C.initialize()
-	defer C.terminate()
+func (s *ServerStt) SpeechToText(srv sttv1.SttAPI_SpeechToTextServer) error {
+	var modelPath string
+	var sampleRate int32
+	var codec commonv1.AudioCodec
+	var channels int32
+	var lang string
 
-	voiceConfig := s.configService.FindDownloaded(in.Lang, in.Speaker)
-	if voiceConfig == nil {
-		return errors.New("voice not found")
-	}
-
-	// TODO: delete after stable release
-	fw, _ := os.Create("/dataset/demo.wav")
-	audioFormat := 1
-	bitDepth := 16
-	sampleRate := voiceConfig.VoiceSpec.Audio.SampleRate
-	enc := wav.NewEncoder(fw, sampleRate, bitDepth, 1, audioFormat)
-
-	defer enc.Close()
-
-	voice := C.loadVoice(C.CString(voiceConfig.OnnxPath), C.CString(voiceConfig.OnnxJsonPath), nil)
-
-	i := register(func(data *C.int16_t, length C.int) {
-		slice := (*[1 << 28]C.int16_t)(unsafe.Pointer(data))[:length:length]
-		out := make([]int32, 0, length)
-		for _, v := range slice {
-			out = append(out, int32(v))
+	var buf []float32
+	for {
+		req, err := srv.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("failed read data: %w", err)
 		}
 
-		enc.Write(&audio.IntBuffer{
-			Format: &audio.Format{
-				NumChannels: 1,
-				SampleRate:  sampleRate,
-			},
-			Data:           ConvertInts[int](out),
-			SourceBitDepth: bitDepth,
-		})
+		// load model
+		if modelPath == "" {
+			langPack := s.configService.FindDownloaded(req.GetLang())
+			if langPack == nil {
+				return errors.New("lang not loaded")
+			}
 
-		srv.Send(&ttsv1.TextToSpeechResponse{
-			RawPcm:     out,
-			SampleRate: int32(sampleRate),
-			BitDepth:   int32(bitDepth),
-		})
+			lang = req.GetLang()
+			modelPath = langPack.ModelPath
+			sampleRate = req.GetData().SampleRate
+			codec = req.GetData().Codec
+			channels = req.GetData().Channels
+			if channels != 1 {
+				return errors.New("require one channels")
+			}
+			if codec == commonv1.AudioCodec_AUDIO_CODEC_INVALID {
+				return errors.New("audio codec is not supported")
+			}
+		}
 
-	})
-	C.textToAudio(voice, C.CString(in.Text), C.int(i))
-	unregister(i)
+		if sampleRate < 16000 {
+			return errors.New("incorrect sample rate: require 16000")
+		}
+
+		rawPcm := downsample(ConvertInts[float32](req.Data.Data), int(sampleRate))
+		buf = append(buf, rawPcm...)
+	}
+
+	model, err := whisper.New(modelPath)
+	if err != nil {
+		return errors.New("failed load language model")
+	}
+
+	defer model.Close()
+
+	// Process samples
+	context, err := model.NewContext()
+	if err != nil {
+		return errors.New("failed create model context")
+	}
+	context.SetLanguage(lang)
+	context.SetTranslate(false)
+
+	if err := context.Process(buf, nil); err != nil {
+		return err
+	}
+
+	for {
+		segment, err := context.NextSegment()
+		if err != nil {
+			break
+		}
+
+		for _, token := range segment.Tokens {
+			srv.Send(&sttv1.SpeechToTextResponse{
+				TokenText:        token.Text,
+				TokenProbability: token.P,
+			})
+		}
+	}
 
 	return nil
 }
 
-func (s *ServerTts) GetVoices(ctx context.Context, in *ttsv1.GetVoicesRequest) (*ttsv1.GetVoicesResponse, error) {
-	var voices []*ttsv1.Voice
+func (s *ServerStt) GetLanguagePacks(ctx context.Context, in *sttv1.GetLanguagePacksRequest) (*sttv1.GetLanguagePacksResponse, error) {
+	var langPacks []*sttv1.LanguagePack
 	for _, v := range s.configService.FindAll() {
-		voices = append(voices, &ttsv1.Voice{
-			Lang:         v.VoiceConf.Lang,
-			Speaker:      v.VoiceConf.Speaker,
+		langPacks = append(langPacks, &sttv1.LanguagePack{
+			Name:         v.LangPack.Name,
+			Languages:    v.LangPack.Languages,
 			Downloaded:   v.Downloaded(),
 			Downloadable: v.Downloadable(),
-			License:      v.VoiceConf.License,
+			License:      v.LangPack.License,
 		})
 	}
 
-	return &ttsv1.GetVoicesResponse{
-		Voices: voices,
+	return &sttv1.GetLanguagePacksResponse{
+		Languages: langPacks,
 	}, nil
 }
 
-func (s *ServerTts) DownloadVoice(ctx context.Context, in *ttsv1.DownloadVoiceRequest) (*ttsv1.DownloadVoiceResponse, error) {
-	err := s.configService.Download(in.Lang, in.Speaker)
+func (s *ServerStt) DownloadLanguagePack(ctx context.Context, in *sttv1.DownloadLanguagePackRequest) (*sttv1.DownloadLanguagePackResponse, error) {
+	err := s.configService.Download(in.Name)
 
-	return &ttsv1.DownloadVoiceResponse{}, err
+	return &sttv1.DownloadLanguagePackResponse{}, err
 }
 
 type Int interface {
@@ -145,4 +138,33 @@ func ConvertInts[U, T Int](s []T) (out []U) {
 		out[i] = U(s[i])
 	}
 	return out
+}
+
+func downsample(pcmData []float32, sampleRate int) []float32 {
+	// Downsample (required sampleRate equal 16000)
+	sampleRateRatio := sampleRate / 16000
+	if sampleRateRatio > 1 {
+		newPcmData := make([]float32, len(pcmData)/sampleRateRatio)
+		var offsetResult = 0
+		var offsetBuffer = 0
+		for offsetResult < len(newPcmData) {
+			var nextOffsetBuffer = int(math.Round(float64(offsetResult+1) * float64(sampleRateRatio)))
+			// Use average value of skipped samples
+			var accum float32
+			var count float32
+			for i := offsetBuffer; i < nextOffsetBuffer && i < len(pcmData); i++ {
+				accum += pcmData[i]
+				count++
+			}
+			newPcmData[offsetResult] = accum / count
+			// Or you can simply get rid of the skipped samples:
+			// result[offsetResult] = buffer[nextOffsetBuffer];
+			offsetResult++
+			offsetBuffer = nextOffsetBuffer
+		}
+
+		return newPcmData
+	}
+
+	return pcmData
 }

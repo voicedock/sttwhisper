@@ -16,16 +16,16 @@ func NewConfReader(path string) *ConfReader {
 	}
 }
 
-func (r *ConfReader) ReadConfig() ([]*VoiceConf, error) {
-	var ret []*VoiceConf
+func (r *ConfReader) ReadConfig() ([]*LanguagePack, error) {
+	var ret []*LanguagePack
 	f, err := os.Open(r.path)
 	if err != nil {
-		return nil, fmt.Errorf("failed open voice config: %w", err)
+		return nil, fmt.Errorf("failed open language pack config: %w", err)
 	}
 
 	err = json.NewDecoder(f).Decode(&ret)
 	if err != nil {
-		return nil, fmt.Errorf("failed read voice config: %w", err)
+		return nil, fmt.Errorf("failed read language pack config: %w", err)
 	}
 
 	return ret, nil
