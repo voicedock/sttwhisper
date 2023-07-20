@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.3.0
 // - protoc             (unknown)
-// source: voicedock/extensions/stt/v1/stt_api.proto
+// source: voicedock/core/stt/v1/stt_api.proto
 
 package sttv1
 
@@ -19,9 +19,9 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	SttAPI_SpeechToText_FullMethodName         = "/voicedock.extensions.stt.v1.SttAPI/SpeechToText"
-	SttAPI_GetLanguagePacks_FullMethodName     = "/voicedock.extensions.stt.v1.SttAPI/GetLanguagePacks"
-	SttAPI_DownloadLanguagePack_FullMethodName = "/voicedock.extensions.stt.v1.SttAPI/DownloadLanguagePack"
+	SttAPI_SpeechToText_FullMethodName         = "/voicedock.core.stt.v1.SttAPI/SpeechToText"
+	SttAPI_GetLanguagePacks_FullMethodName     = "/voicedock.core.stt.v1.SttAPI/GetLanguagePacks"
+	SttAPI_DownloadLanguagePack_FullMethodName = "/voicedock.core.stt.v1.SttAPI/DownloadLanguagePack"
 )
 
 // SttAPIClient is the client API for SttAPI service.
@@ -198,7 +198,7 @@ func _SttAPI_DownloadLanguagePack_Handler(srv interface{}, ctx context.Context, 
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var SttAPI_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "voicedock.extensions.stt.v1.SttAPI",
+	ServiceName: "voicedock.core.stt.v1.SttAPI",
 	HandlerType: (*SttAPIServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
@@ -218,5 +218,5 @@ var SttAPI_ServiceDesc = grpc.ServiceDesc{
 			ClientStreams: true,
 		},
 	},
-	Metadata: "voicedock/extensions/stt/v1/stt_api.proto",
+	Metadata: "voicedock/core/stt/v1/stt_api.proto",
 }

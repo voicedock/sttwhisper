@@ -3,69 +3,90 @@ package config
 import (
 	"errors"
 	"fmt"
+	"go.uber.org/zap"
+	"os"
 	"path/filepath"
 )
 
 type Service struct {
-	confReader      *ConfReader
-	dataReader      *DataReader
-	downloader      *Downloader
-	config          []*LangPackData
-	idxConfig       map[string]*LangPackData
-	idxByNameConfig map[string]*LangPackData
-	dataDir         string
+	confReader *Reader
+	downloader *Downloader
+	logger     *zap.Logger
+	config     []*ModelWrap
+	idxByLang  map[string]*ModelWrap
+	idx        map[string]*ModelWrap
+	dataDir    string
 }
 
 func NewService(
-	confReader *ConfReader,
-	dataReader *DataReader,
+	confReader *Reader,
 	downloader *Downloader,
+	logger *zap.Logger,
 	dataDir string,
 ) *Service {
 	return &Service{
-		confReader:      confReader,
-		dataReader:      dataReader,
-		downloader:      downloader,
-		config:          []*LangPackData{},
-		idxConfig:       make(map[string]*LangPackData),
-		idxByNameConfig: make(map[string]*LangPackData),
-		dataDir:         dataDir,
+		confReader: confReader,
+		downloader: downloader,
+		logger:     logger,
+		config:     []*ModelWrap{},
+		idxByLang:  make(map[string]*ModelWrap),
+		idx:        make(map[string]*ModelWrap),
+		dataDir:    dataDir,
 	}
 }
 
 func (s *Service) LoadConfig() error {
-	langConf, err := s.confReader.ReadConfig()
+	items, err := s.confReader.ReadConfig()
 	if err != nil {
-		return fmt.Errorf("failed load config: %w", err)
+		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	var cfg []*LangPackData
-	for _, v := range langConf {
-		vData, _ := s.dataReader.ReadData(v)
-		cfg = append(cfg, vData)
+	models := make([]*ModelWrap, 0, len(items))
+	idx := map[string]*ModelWrap{}
+	idxByLang := map[string]*ModelWrap{}
+	for _, v := range items {
+		if _, ok := idx[v.Name]; ok {
+			s.logger.Warn("Model with same name skipped", zap.String("name", v.Name))
+			continue
+		}
+
+		model := s.WrapModel(v)
+		idx[v.Name] = model
+		models = append(
+			models,
+			model,
+		)
+
+		idx[v.Name] = model
+		for _, langCode := range v.Languages {
+			idxByLang[langCode] = model
+		}
 	}
 
-	s.config = cfg
-
-	s.RebuildIdx()
+	s.config = models
+	s.idx = idx
+	s.idxByLang = idxByLang
 	return nil
 }
 
-func (s *Service) RebuildIdx() {
-	for _, langData := range s.config {
-		s.idxByNameConfig[langData.LangPack.Name] = langData
-		for _, langCode := range langData.LangPack.Languages {
-			s.idxConfig[langCode] = langData
-		}
+func (s *Service) WrapModel(model *Model) *ModelWrap {
+	ret := &ModelWrap{
+		Model:     model,
+		ModelPath: filepath.Join(s.dataDir, model.Name, "model.bin"),
 	}
+
+	_, err := os.Stat(ret.ModelPath)
+	ret.Downloaded = !os.IsNotExist(err)
+
+	return ret
 }
 
-func (s *Service) FindAll() []*LangPackData {
+func (s *Service) FindAll() []*ModelWrap {
 	return s.config
 }
 
 func (s *Service) Download(name string) error {
-	langPack, ok := s.idxByNameConfig[name]
+	langPack, ok := s.idx[name]
 	if !ok {
 		return errors.New("language pack not found")
 	}
@@ -74,18 +95,17 @@ func (s *Service) Download(name string) error {
 		return errors.New("language pack is not downloadable")
 	}
 
-	dowloadUrl := filepath.Join(s.dataDir, langPack.LangPack.Name, "model.bin")
-	err := s.downloader.Download(langPack.LangPack.DownloadUrl, dowloadUrl)
+	err := s.downloader.Download(langPack.Model.DownloadUrl, langPack.ModelPath)
 	if err != nil {
-		return fmt.Errorf("faile download language pack: %w", err)
+		return fmt.Errorf("failed to download language pack: %w", err)
 	}
 
 	return s.LoadConfig()
 }
 
-func (s *Service) FindDownloaded(lang string) *LangPackData {
-	ret := s.idxConfig[lang]
-	if ret != nil && ret.Downloaded() {
+func (s *Service) FindDownloaded(lang string) *ModelWrap {
+	ret := s.idxByLang[lang]
+	if ret != nil && ret.Downloaded {
 		return ret
 	}
 

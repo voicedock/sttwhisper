@@ -1,24 +1,52 @@
 # STT Whisper
-Whisper.cpp based [VoiceDock STT](https://github.com/voicedock/voicedock-specs/blob/main/proto/voicedock/extensions/stt/v1/) implementation
+Whisper.cpp based [VoiceDock STT](https://github.com/voicedock/voicedock-specs/blob/main/proto/voicedock/core/stt/v1/) implementation
 
 > Provides gRPC API for high quality speech-to-text (from raw PCM stream) based on [Whisper.cpp](https://github.com/ggerganov/whisper.cpp) project.
 > Provides download of new language packs via API.
 
 # Usage
-Build docker image:
-```bash
-docker build -t sttwhisper .
-```
-Run docker container:
+Run docker container on CPU:
 ```bash
 docker run --rm \
   -v "$(pwd)/config:/data/config" \
   -v "$(pwd)/dataset:/data/dataset" \
   -p 9999:9999 \
-  sttwhisper sttwhisper
+  ghcr.io/voicedock/sttwhisper:latest sttwhisper
 ```
+Run docker container on GPU (Nvidia CUDA):
+```bash
+docker run --rm \
+  -v "$(pwd)/config:/data/config" \
+  -v "$(pwd)/dataset:/data/dataset" \
+  -p 9999:9999 \
+  ghcr.io/voicedock/sttwhisper:gpu sttwhisper
+```
+Tested on NVIDIA GeForce RTX 3090.
+
+Show more options:
+```bash
+docker run --rm ghcr.io/voicedock/sttwhisper sttwhisper -h
+```
+```
+Usage: sttwhisper [--grpcaddr GRPCADDR] [--config CONFIG] [--datadir DATADIR] [--loglevel LOGLEVEL] [--logjson] [--whispermaxsegmentlen WHISPERMAXSEGMENTLEN] [--whispermaxtokens WHISPERMAXTOKENS] [--whisperthreads WHISPERTHREADS]
+
+Options:
+  --grpcaddr GRPCADDR    gRPC API host:port [default: 0.0.0.0:9999, env: GRPC_ADDR]
+  --config CONFIG        configuration file for models [default: /data/config/sttwhisper.json, env: CONFIG]
+  --datadir DATADIR      dataset directory [default: /data/dataset, env: DATA_DIR]
+  --loglevel LOGLEVEL    log level: debug, info, warn, error, dpanic, panic, fatal [default: info, env: LOG_LEVEL]
+  --logjson              set to true to use JSON format [env: LOG_JSON]
+  --whispermaxsegmentlen WHISPERMAXSEGMENTLEN
+                         maximum segment length in characters (0 = no limit) [env: WHISPER_MAX_SEGMENT_LEN]
+  --whispermaxtokens WHISPERMAXTOKENS
+                         maximum tokens per segment (0 = no limit) [env: WHISPER_MAX_TOKENS]
+  --whisperthreads WHISPERTHREADS
+                         number of threads to use during computation (0 = MAX) [env: WHISPER_THREADS]
+  --help, -h             display this help and exit
+```
+
 ## API
-See implementation in [proto file](https://github.com/voicedock/voicedock-specs/blob/main/proto/voicedock/extensions/stt/v1/stt_api.proto).
+See implementation in [proto file](https://github.com/voicedock/voicedock-specs/blob/main/proto/voicedock/core/stt/v1/stt_api.proto).
 
 ## FAQ
 ### How to add a language pack?
@@ -41,18 +69,21 @@ See implementation in [proto file](https://github.com/voicedock/voicedock-specs/
 
 
 ## CONTRIBUTING
-Create protobuilder docker image:
-```bash
-cd ci/protobuilder && \
-docker build -t protobuilder .
-```
 Lint proto files:
 ```bash
 docker run --rm -w "/work" -v "$(pwd):/work" bufbuild/buf:latest lint internal/api/grpc/proto
 ```
 Generate grpc interface:
 ```bash
-docker run --rm -w "/work" -v "$(pwd):/work" protobuilder generate internal/api/grpc/proto --template internal/api/grpc/proto/buf.gen.yaml
+docker run --rm -w "/work" -v "$(pwd):/work" ghcr.io/voicedock/protobuilder:1.0.0 generate internal/api/grpc/proto --template internal/api/grpc/proto/buf.gen.yaml
+```
+Manual build CPU docker image:
+```bash
+docker build -t ghcr.io/voicedock/sttwhisper:latest .
+```
+Manual build GPU docker image:
+```bash
+docker build -t ghcr.io/voicedock/sttwhisper:gpu -f ./gpu.Dockerfile .
 ```
 
 ## Thanks

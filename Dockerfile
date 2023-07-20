@@ -15,7 +15,7 @@ RUN wget https://github.com/ggerganov/whisper.cpp/archive/refs/tags/v1.4.0.tar.g
     cd bindings/go && \
     make whisper && \
     cd /usr/src/app && \
-    C_INCLUDE_PATH=/build LIBRARY_PATH=/build go build -o ./sttwhisper ./cmd/sttwhisper/main.go
+    C_INCLUDE_PATH=/build LIBRARY_PATH=/build go build -o ./sttwhisper ./cmd/sttwhisper
 
 FROM debian:12
 
@@ -25,3 +25,5 @@ RUN apt update && \
     rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /usr/src/app/sttwhisper /usr/local/bin/sttwhisper
+
+CMD ["sttwhisper"]

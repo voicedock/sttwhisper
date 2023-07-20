@@ -1,14 +1,14 @@
 syntax = "proto3";
 
-package voicedock.extensions.stt.v1;
+package voicedock.core.stt.v1;
 
-option csharp_namespace = "Voicedock.Extensions.Stt.V1";
-option go_package = "voicedock/extensions/stt/v1;sttv1";
+option csharp_namespace = "Voicedock.Core.Stt.V1";
+option go_package = "voicedock/core/stt/v1;sttv1";
 option java_multiple_files = true;
 option java_outer_classname = "SttProto";
-option java_package = "com.voicedock.extensions.stt.v1";
-option objc_class_prefix = "VES";
-option php_namespace = "Voicedock\\Extensions\\Stt\\V1";
+option java_package = "com.voicedock.core.stt.v1";
+option objc_class_prefix = "VCS";
+option php_namespace = "Voicedock\\Core\\Stt\\V1";
 
 // Language pack info.
 message LanguagePack {

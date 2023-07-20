@@ -28,15 +28,15 @@ func (d *Downloader) Download(url, outPath string) error {
 func (d *Downloader) saveFile(r io.Reader, outPath string) error {
 	err := os.MkdirAll(filepath.Dir(outPath), 0755)
 	if err != nil {
-		return fmt.Errorf("failed create out directory: %w", err)
+		return fmt.Errorf("failed to create out directory: %w", err)
 	}
 
 	outFile, err := os.Create(outPath)
 	if err != nil {
-		return fmt.Errorf("failed create file: %w", err)
+		return fmt.Errorf("failed to create file: %w", err)
 	}
 	if _, err := io.Copy(outFile, r); err != nil {
-		return fmt.Errorf("failed write file: %w", err)
+		return fmt.Errorf("failed to write file: %w", err)
 	}
 	outFile.Close()
 

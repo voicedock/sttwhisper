@@ -1,17 +1,17 @@
 syntax = "proto3";
 
-package voicedock.extensions.stt.v1;
+package voicedock.core.stt.v1;
 
-option csharp_namespace = "Voicedock.Extensions.Stt.V1";
-option go_package = "voicedock/extensions/stt/v1;sttv1";
+option csharp_namespace = "Voicedock.Core.Stt.V1";
+option go_package = "voicedock/core/stt/v1;sttv1";
 option java_multiple_files = true;
 option java_outer_classname = "SttApiProto";
-option java_package = "com.voicedock.extensions.stt.v1";
-option objc_class_prefix = "VES";
-option php_namespace = "Voicedock\\Extensions\\Stt\\V1";
+option java_package = "com.voicedock.core.stt.v1";
+option objc_class_prefix = "VCS";
+option php_namespace = "Voicedock\\Core\\Stt\\V1";
 
-import "voicedock/extensions/common/v1/audiostream.proto";
-import "voicedock/extensions/stt/v1/stt.proto";
+import "voicedock/core/common/v1/audio.proto";
+import "voicedock/core/stt/v1/stt.proto";
 
 // Speech-to-text service.
 service SttAPI {
@@ -24,8 +24,8 @@ service SttAPI {
 }
 
 message SpeechToTextRequest {
-  // Audio data
-  voicedock.extensions.common.v1.AudioStream data = 1;
+  // Audio stream
+  voicedock.core.common.v1.AudioContainer audio = 1;
   // Audio language
   string lang = 2;
 }
