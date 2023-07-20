@@ -56,5 +56,5 @@ jobs:
           echo GPU_VERSION=$GPU_VERSION
           docker tag $IMAGE_NAME $IMAGE_ID:$VERSION
           docker push $IMAGE_ID:$VERSION
-          docker tag $IMAGE_NAME:gpu $IMAGE_ID:$VERSION
-          docker push $IMAGE_ID:$VERSION
+          docker tag $IMAGE_NAME:gpu $IMAGE_ID:$GPU_VERSION
+          docker push $IMAGE_ID:$GPU_VERSION
